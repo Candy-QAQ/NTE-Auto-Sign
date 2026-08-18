@@ -39,13 +39,24 @@ python nte.py
 `TOKEN.txt` 每行一个账号，推荐使用 JSON：
 
 ```json
-{"refreshToken":"xxx","uid":"10xxxx","deviceId":"xxxxx","gameId":"1289","roleIds":["2160xxxxxxx"]}
+{
+  "refreshToken": "xxx",
+  "uid": "10xxxx",
+  "deviceId": "xxxxx",
+  "gameId": "1289",
+  "roleIds": ["2160xxxxxxx"]
+}
 ```
 
 云异环账号可以只保存云时长领取所需字段：
 
 ```json
-{"cloudToken":"xxx","cloudUserId":"152xxxx","cloudDeviceId":"xxxxx","deviceId":"xxxxx"}
+{
+  "cloudToken": "xxx",
+  "cloudUserId": "152xxxx",
+  "cloudDeviceId": "xxxxx",
+  "deviceId": "xxxxx"
+}
 ```
 
 同一个账号也可以同时保存塔吉多签到和云异环时长字段，运行时会自动执行两部分。
@@ -71,6 +82,45 @@ python nte.py
 
 默认定时任务为每天北京时间 08:00。工作流运行时会通过环境变量 `TOKEN` 读取 `NTE_TOKEN`，不会依赖仓库中的 `TOKEN.txt`。
 
+## 青龙面板部署（订阅拉取，自动建任务）
+
+无需修改源码。将本仓库添加到青龙「订阅管理」后，会自动拉取脚本，并自动创建一个「塔吉多（异环）自动签到」定时任务（默认每天 08:00，由脚本头部 `cron` 声明）。
+
+### 1. 添加订阅
+
+在青龙面板「订阅管理」中添加本仓库，或在「定时任务」新建一条拉库任务，命令为：
+
+```
+ql repo https://github.com//NTE-Auto-Sign.git "" "index.py|add_account.py|SecuritySm.py|test|nte.py" "nte.py|requirements.txt" "main" "py"
+```
+
+参数说明：
+
+- 白名单（第 2 个参数，空）：不限制拉取范围；
+- 黑名单（第 3 个参数）：排除 `index.py`、`add_account.py`、`SecuritySm.py`、`test/`，以及 `nte.py`（`nte.py` 会在依赖里单独拉取，避免重复建任务）；
+- 依赖（第 4 个参数）：`nte.py`（签到核心，供入口 `import` 使用）+ `requirements.txt`（自动安装 `requests`、`cryptography`）；
+- 分支：`main`；后缀：`py`。
+
+> 国内服务器拉 GitHub 较慢时，可在仓库地址前加青龙代理前缀（例如 `https://ghproxy.com/` 或面板内配置的代理镜像）。
+
+### 2. 拉取后自动建任务
+
+订阅执行后，青龙会识别到 `qinglong.py`，并根据其头部声明自动创建定时任务：
+
+```text
+塔吉多（异环）自动签到  cron: 0 8 * * *  （每天 08:00）
+```
+
+只需确认任务已启用，无需手动新建。
+
+### 3. 配置账号
+
+在青龙面板「环境变量」中新增变量 `NTE_TOKEN`（仅支持此变量名），内容与 `TOKEN.txt` 相同，多账号时每一行一个账号 JSON。
+
+### 4. 运行与日志
+
+脚本会在 `logs/` 目录输出当天日志，签到失败时任务退出码为 `1`，可在面板中区分成败。
+
 ## Windows EXE 使用
 
 预编译文件位于 `dist\windows\`：
@@ -82,16 +132,16 @@ python nte.py
 
 ## 环境变量
 
-| 变量 | 说明 |
-| --- | --- |
-| `TOKEN` | 账号信息（支持多行，格式同 `TOKEN.txt`） |
-| `TGD_GAME_ID` | 默认游戏 ID（默认 `1289`） |
-| `TGD_ROLE_IDS` | 角色 ID（逗号分隔，补充/覆盖自动拉取） |
-| `TGD_SIGN_GAME_IDS` | 签到时尝试的 gameId 列表（逗号分隔） |
-| `TGD_SELECT_ACCOUNTS=1` | 多账号时手动选择账号；默认签到全部 |
-| `EXIT_WHEN_FAIL=on` | 任一账号失败时，进程退出码为 1 |
-| `NO_PAUSE=1` | Windows 下失败时不等待回车 |
-| `SKYLAND_TYPE=add_account` | 仅添加账号，不执行签到 |
+| 变量                         | 说明                                      |
+| ---------------------------- | ----------------------------------------- |
+| `TOKEN`                    | 账号信息（支持多行，格式同`TOKEN.txt`） |
+| `TGD_GAME_ID`              | 默认游戏 ID（默认`1289`）               |
+| `TGD_ROLE_IDS`             | 角色 ID（逗号分隔，补充/覆盖自动拉取）    |
+| `TGD_SIGN_GAME_IDS`        | 签到时尝试的 gameId 列表（逗号分隔）      |
+| `TGD_SELECT_ACCOUNTS=1`    | 多账号时手动选择账号；默认签到全部        |
+| `EXIT_WHEN_FAIL=on`        | 任一账号失败时，进程退出码为 1            |
+| `NO_PAUSE=1`               | Windows 下失败时不等待回车                |
+| `SKYLAND_TYPE=add_account` | 仅添加账号，不执行签到                    |
 
 ### 手动选择账号
 
@@ -124,7 +174,7 @@ pause
 
 ## 致谢
 
-本项目基于 skyland-auto-sign 修改：  
+本项目基于 skyland-auto-sign 修改：
 https://gitee.com/FancyCabbage/skyland-auto-sign
 
 ## 演示图片
