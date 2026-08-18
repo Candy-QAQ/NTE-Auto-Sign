@@ -82,44 +82,65 @@ python nte.py
 
 默认定时任务为每天北京时间 08:00。工作流运行时会通过环境变量 `TOKEN` 读取 `NTE_TOKEN`，不会依赖仓库中的 `TOKEN.txt`。
 
-## 青龙面板部署（订阅拉取，自动建任务）
+## 青龙面板部署（Debian）
 
-无需修改源码。将本仓库添加到青龙「订阅管理」后，会自动拉取脚本，并自动创建一个「塔吉多（异环）自动签到」定时任务（默认每天 08:00，由脚本头部 `cron` 声明）。
+> 无需二次部署。青龙面板（Debian 容器）自带 Python3，接入本仓库后可自动拉取脚本并自动建立定时任务。
 
-### 1. 添加订阅
+### 方式一：订阅拉取
 
-在青龙面板「订阅管理」中添加本仓库，或在「定时任务」新建一条拉库任务，命令为：
+1. **新建拉库任务**
 
-```
-ql repo https://github.com//NTE-Auto-Sign.git "" "index.py|add_account.py|SecuritySm.py|test|nte.py" "nte.py|requirements.txt" "main" "py"
-```
+   在「订阅管理」新建一条任务，复制下面命令，并在名称中粘贴：
 
-参数说明：
+   ```
+   ql repo https://github.com/Candy-QAQ/NTE-Auto-Sign.git "" "index.py|add_account.py|SecuritySm.py|test|nte.py" "nte.py|requirements.txt" "main" "py"
+   ```
 
-- 白名单（第 2 个参数，空）：不限制拉取范围；
-- 黑名单（第 3 个参数）：排除 `index.py`、`add_account.py`、`SecuritySm.py`、`test/`，以及 `nte.py`（`nte.py` 会在依赖里单独拉取，避免重复建任务）；
-- 依赖（第 4 个参数）：`nte.py`（签到核心，供入口 `import` 使用）+ `requirements.txt`（自动安装 `requests`、`cryptography`）；
-- 分支：`main`；后缀：`py`。
+   粘贴后按图补全，其余留空或按需填写
+   ![青龙演示图1](assets/ql1.png)![青龙演示图2](assets/ql2.png)
 
-> 国内服务器拉 GitHub 较慢时，可在仓库地址前加青龙代理前缀（例如 `https://ghproxy.com/` 或面板内配置的代理镜像）。
+   命令参数说明：
 
-### 2. 拉取后自动建任务
+   - 白名单（第 2 个参数，`""`， 也就是无参数）：不过滤，拉取全部文件；
+   - 黑名单（第 3 个参数）：排除 `index.py`、`add_account.py`、`SecuritySm.py`、`test/`，以及 `nte.py`（`nte.py` 改由依赖方式拉取，避免重复建任务）；
+   - 依赖（第 4 个参数）：`nte.py` 是签到核心（供入口 `import` 使用），`requirements.txt` 用于自动安装 `requests`、`cryptography`依赖；
+   - 分支 `main`、后缀 `py`。
 
-订阅执行后，青龙会识别到 `qinglong.py`，并根据其头部声明自动创建定时任务：
+   > 使用 GitHub 仓库需要自行解决网络问题，地址前可加代理理前缀。
 
-```text
-塔吉多（异环）自动签到  cron: 0 8 * * *  （每天 08:00）
-```
+2. **确认自动建任务**
 
-只需确认任务已启用，无需手动新建。
+   拉库后，青龙会识别 `qinglong.py`，并根据其头部声明自动创建定时任务：
 
-### 3. 配置账号
+   _塔吉多（异环）自动签到 cron: 0 8 _ \* _ （每天 08:00）_
 
-在青龙面板「环境变量」中新增变量 `NTE_TOKEN`（仅支持此变量名），内容与 `TOKEN.txt` 相同，多账号时每一行一个账号 JSON。
+   签到时间由 [qinglong.py](qinglong.py) 头部 `cron: 0 8 * * *` 决定，需要改时间时直接改头部，或在面板里修改任务定时规则。
 
-### 4. 运行与日志
+3. **配置账号**
+   在「环境变量」中新增变量 `NTE_TOKEN`（仅支持此变量名），值与此值的格式与本项目中的 `TOKEN.txt` 相同，多账号时每一行一个账号 JSON。
+4. **运行与结果**
+   运行成功会输出类似下文的文本
 
-脚本会在 `logs/` 目录输出当天日志，签到失败时任务退出码为 `1`，可在面板中区分成败。
+   > 开始执行... 2026-08-19 00:57:53
+   > 塔吉多（异环）自动签到
+   > 使用环境变量里的账号信息...
+   > 从环境变量中读取到 1 个账号...
+   > 账号**\*\***：社区签到成功，获得 5 经验，金币 40
+   > 角色 21****\*\*\*****签到成功：签到成功（gameId=\*\*\*\*），今日道具：x
+   > 签到完成！
+   >
+   > 完成 ✅... 2026-08-19 00:57:55 耗时 2 秒
+
+### 方式二：手动上传脚本
+
+1. 将 `nte.py`、`qinglong.py` 上传到青龙脚本目录（`/ql/scripts/`）；
+2. 安装依赖：`pip3 install requests cryptography`；若镜像找不到 `cryptography`，换源：`pip3 install cryptography -i https://mirrors.aliyun.com/pypi/simple/`；
+3. 在「定时任务」新建任务，命令填 `python3 qinglong.py`，定时规则填 `0 0 8 * * *`；
+4. 配置环境变量 `NTE_TOKEN`（同上）。
+
+### 获取 token
+
+在本地或服务器运行 `python add_account.py`，按提示登录（`1` 手机号+验证码 / `2` 手机号+密码），成功后把 `TOKEN.txt` 里的对应账号 JSON 复制到青龙的 `NTE_TOKEN`。账号格式参考上文「账号文件（TOKEN.txt）」。
 
 ## Windows EXE 使用
 
@@ -132,16 +153,16 @@ ql repo https://github.com//NTE-Auto-Sign.git "" "index.py|add_account.py|Securi
 
 ## 环境变量
 
-| 变量                         | 说明                                      |
-| ---------------------------- | ----------------------------------------- |
+| 变量                       | 说明                                    |
+| -------------------------- | --------------------------------------- |
 | `TOKEN`                    | 账号信息（支持多行，格式同`TOKEN.txt`） |
 | `TGD_GAME_ID`              | 默认游戏 ID（默认`1289`）               |
-| `TGD_ROLE_IDS`             | 角色 ID（逗号分隔，补充/覆盖自动拉取）    |
-| `TGD_SIGN_GAME_IDS`        | 签到时尝试的 gameId 列表（逗号分隔）      |
-| `TGD_SELECT_ACCOUNTS=1`    | 多账号时手动选择账号；默认签到全部        |
-| `EXIT_WHEN_FAIL=on`        | 任一账号失败时，进程退出码为 1            |
-| `NO_PAUSE=1`               | Windows 下失败时不等待回车                |
-| `SKYLAND_TYPE=add_account` | 仅添加账号，不执行签到                    |
+| `TGD_ROLE_IDS`             | 角色 ID（逗号分隔，补充/覆盖自动拉取）  |
+| `TGD_SIGN_GAME_IDS`        | 签到时尝试的 gameId 列表（逗号分隔）    |
+| `TGD_SELECT_ACCOUNTS=1`    | 多账号时手动选择账号；默认签到全部      |
+| `EXIT_WHEN_FAIL=on`        | 任一账号失败时，进程退出码为 1          |
+| `NO_PAUSE=1`               | Windows 下失败时不等待回车              |
+| `SKYLAND_TYPE=add_account` | 仅添加账号，不执行签到                  |
 
 ### 手动选择账号
 
