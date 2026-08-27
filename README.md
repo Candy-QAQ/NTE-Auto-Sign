@@ -108,7 +108,7 @@ python nte.py
    命令参数说明：
 
    - 白名单（第 2 个参数，`""`， 也就是无参数）：不过滤，拉取全部文件；
-   - 黑名单（第 3 个参数）：排除`add_account.py`、`SecuritySm.py`、`test/`，以及 `nte.py`（`nte.py` 改由依赖方式拉取，避免重复建任务）；
+   - 黑名单（第 3 个参数）：排除`index.py`、`add_account.py`、`SecuritySm.py`、`test/`，以及 `nte.py`（`nte.py` 改由依赖方式拉取，避免重复建任务）；
    - 依赖（第 4 个参数）：`nte.py` 是签到核心（供入口 `import` 使用），`requirements.txt` 用于自动安装 `requests`、`cryptography`依赖；
    - 分支 `main`、后缀 `py`。
 
