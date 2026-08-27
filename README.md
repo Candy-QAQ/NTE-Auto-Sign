@@ -96,8 +96,7 @@ python nte.py
    ql repo https://github.com/Candy-QAQ/NTE-Auto-Sign.git "" "index.py|add_account.py|SecuritySm.py|test|nte.py" "nte.py|requirements.txt" "main" "py"
    ```
 
-   粘贴后按图补全，其余留空或按需填写
-   ![青龙演示图1](assets/ql1.png)![青龙演示图2](assets/ql2.png)
+   粘贴后按图补全，其余留空或按需填写。
 
    命令参数说明：
 
@@ -200,8 +199,18 @@ https://gitee.com/FancyCabbage/skyland-auto-sign
 
 ## 演示图片
 
-![演示图 1](assets/1.png)
-![演示图 2](assets/2.png)
-![演示图 3](assets/3.png)
-![青龙面板演示图 1](assets/ql1.png)
-![青龙面板演示图 2](assets/ql2.png)
+<p align="center">
+  <img src="assets/1.png" alt="演示图 1" width="800">
+</p>
+<p align="center">
+  <img src="assets/2.png" alt="演示图 2" width="800">
+</p>
+<p align="center">
+  <img src="assets/3.png" alt="演示图 3" width="800">
+</p>
+<p align="center">
+  <img src="assets/ql1.png" alt="青龙面板演示图 1" width="800">
+</p>
+<p align="center">
+  <img src="assets/ql2.png" alt="青龙面板演示图 2" width="800">
+</p>
