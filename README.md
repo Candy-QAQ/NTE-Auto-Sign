@@ -98,6 +98,13 @@ python nte.py
 
    粘贴后按图补全，其余留空或按需填写。
 
+   <p align="center">
+     <img src="assets/ql1.png" alt="青龙面板订阅配置演示图 1" width="800">
+   </p>
+   <p align="center">
+     <img src="assets/ql2.png" alt="青龙面板订阅配置演示图 2" width="800">
+   </p>
+
    命令参数说明：
 
    - 白名单（第 2 个参数，`""`， 也就是无参数）：不过滤，拉取全部文件；
@@ -207,10 +214,4 @@ https://gitee.com/FancyCabbage/skyland-auto-sign
 </p>
 <p align="center">
   <img src="assets/3.png" alt="演示图 3" width="800">
-</p>
-<p align="center">
-  <img src="assets/ql1.png" alt="青龙面板演示图 1" width="800">
-</p>
-<p align="center">
-  <img src="assets/ql2.png" alt="青龙面板演示图 2" width="800">
 </p>
