@@ -203,3 +203,5 @@ https://gitee.com/FancyCabbage/skyland-auto-sign
 ![演示图 1](assets/1.png)
 ![演示图 2](assets/2.png)
 ![演示图 3](assets/3.png)
+![青龙面板演示图 1](assets/ql1.png)
+![青龙面板演示图 2](assets/ql2.png)
