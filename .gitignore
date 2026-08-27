@@ -14,3 +14,6 @@ build/
 
 .env
 .env.*
+
+# Local account credentials (including dist/windows/TOKEN.txt)
+TOKEN.txt

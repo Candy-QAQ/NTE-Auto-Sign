@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import os.path
+import secrets
+import string
 import time
 import uuid
 from datetime import date
@@ -38,8 +40,8 @@ DEVICEMODEL = 'LGE-AN10'
 SDKVERSION = '4.129.0'
 BID = 'com.pwrd.htassistant'
 CHANNELID = '1'
-# usercenter/login + refreshToken 对 appversion 校验严格，当前可用值是 1.1.0
-APPVERSION = '1.1.0'
+USER_CENTER_APPVERSION = '1.2.5'
+USER_CENTER_DS_SECRET = 'pUds3dfMkl'
 OKHTTP_UA = 'okhttp/4.12.0'
 WEBVIEW_UA = (
     'Mozilla/5.0 (Linux; Android 15; TB321FU Build/AQ3A.240912.001; wv) '
@@ -82,7 +84,7 @@ CLOUD_GAME_HEADERS = {
 SEND_CAPTCHA_URL = 'https://user.laohu.com/m/newApi/sendPhoneCaptchaWithOutLogin'
 CHECK_CAPTCHA_URL = 'https://user.laohu.com/m/newApi/checkPhoneCaptchaWithOutLogin'
 LOGIN_URL = 'https://user.laohu.com/openApi/sms/new/login'
-PASSWORD_LOGIN_URL = 'https://user.laohu.com/m/newApi/login'
+SECURE_PASSWORD_LOGIN_URL = 'https://user.laohu.com/openApi/secureLogin'
 CLOUD_QUERY_PASSWORD_URL = 'https://user.laohu.com/m/newApi/query/whetherSetPassword'
 USER_CENTER_LOGIN_URL = 'https://bbs-api.tajiduo.com/usercenter/api/login'
 REFRESH_TOKEN_URL = 'https://bbs-api.tajiduo.com/usercenter/api/refreshToken'
@@ -243,6 +245,16 @@ def generate_signature_with_secret(params, secret):
 
 def generate_signature(params):
     return generate_signature_with_secret(params, SECRET)
+
+
+def _user_center_ds():
+    timestamp = str(int(time.time()))
+    alphabet = string.ascii_letters + string.digits
+    nonce = ''.join(secrets.choice(alphabet) for _ in range(8))
+    digest = hashlib.md5(
+        f'{timestamp}{nonce}{USER_CENTER_APPVERSION}{USER_CENTER_DS_SECRET}'.encode('utf-8')
+    ).hexdigest()
+    return f'{timestamp},{nonce},{digest}'
 
 
 def _cloud_generate_signature(params):
@@ -662,38 +674,45 @@ def cloud_login(phone, code, device_id):
     return token, str(user_id)
 
 
-def _login_with_password_raw(phone, password, device_id, encrypt):
-    username = _aes_base64_encode(phone) if encrypt else phone
-    login_password = _aes_base64_encode(password) if encrypt else password
+def _login_with_password_secure(phone, password, device_id):
     data = {
-        'deviceType': DEVICETYPE,
-        'type': TYPE,
+        'deviceType': 'Pixel 6',
+        'idfa': '',
+        'adm': '',
         'deviceId': device_id,
-        'deviceName': DEVICENAME,
-        'versionCode': VERSIONCODE,
-        't': str(int(time.time())),
-        'areaCodeId': AREACODEID,
+        'version': '17',
+        'deviceName': 'Pixel 6',
+        'mac': '',
+        't': str(int(time.time() * 1000)),
         'appId': APP_ID,
-        'deviceSys': DEVICESYS,
-        'username': username,
-        'password': login_password,
-        'deviceModel': DEVICEMODEL,
-        'sdkVersion': SDKVERSION,
+        'deviceSys': '14',
+        'username': _aes_base64_encode(phone),
+        'password': _aes_base64_encode(password),
+        'deviceModel': 'Pixel 6',
+        'sdkVersion': '4.327.0',
         'bid': BID,
         'channelId': CHANNELID,
     }
     data['sign'] = generate_signature(data)
-    return _safe_json(_request_form(PASSWORD_LOGIN_URL, data, REQUEST_HEADERS_BASE), '密码登录')
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'User-Agent': (
+            'LaohuSDK/4.327.0 '
+            '(android os 14;mobile  manufacturer Google; model Pixel 6) '
+        ),
+        'robot-auth-type': '2',
+    }
+    return _safe_json(
+        _request_form(SECURE_PASSWORD_LOGIN_URL, data, headers),
+        '安全密码登录',
+    )
 
 
 def login_with_password(phone, password, device_id):
-    resp = _login_with_password_raw(phone, password, device_id, encrypt=False)
+    # 使用当前客户端的 secureLogin 协议。
+    resp = _login_with_password_secure(phone, password, device_id)
     if not _is_ok(resp):
-        msg = str(resp.get('message') or resp.get('msg') or resp)
-        if 'BAD_REQUEST' in msg:
-            resp = _login_with_password_raw(phone, password, device_id, encrypt=True)
-        if not _is_ok(resp):
-            raise Exception(f'密码登录失败：{resp.get("message") or resp.get("msg") or resp}')
+        raise Exception(f'密码登录失败：{resp.get("message") or resp.get("msg") or resp}')
     result = resp.get('result') or {}
     token = result.get('token')
     user_id = result.get('userId')
@@ -703,12 +722,16 @@ def login_with_password(phone, password, device_id):
 
 
 def user_center_login(token, user_id, device_id):
+    # 当前塔吉多客户端使用 1.2.5 协议，登录请求必须携带 ds 签名。
     headers = {
         **REQUEST_HEADERS_BASE,
-        'deviceid': device_id,
-        'authorization': '',
-        'appversion': APPVERSION,
-        'uid': '10000000',
+        'Accept': 'application/json, text/plain, */*',
+        'deviceId': device_id,
+        'Authorization': '',
+        'appVersion': USER_CENTER_APPVERSION,
+        'uid': '0',
+        'debug-uid': '3',
+        'ds': _user_center_ds(),
         'User-Agent': OKHTTP_UA,
     }
     payload = {
@@ -726,12 +749,16 @@ def user_center_login(token, user_id, device_id):
 
 
 def refresh_access_token(account):
+    # 新版用户中心签发的 refreshToken 需要配套 1.2.5 + ds 请求头。
     headers = {
         **REQUEST_HEADERS_BASE,
-        'deviceid': account['deviceId'],
-        'authorization': account['refreshToken'],
-        'appversion': APPVERSION,
-        'uid': '10000000',
+        'Accept': 'application/json, text/plain, */*',
+        'deviceId': account['deviceId'],
+        'Authorization': account['refreshToken'],
+        'appVersion': USER_CENTER_APPVERSION,
+        'uid': str(account.get('uid') or '0'),
+        'debug-uid': '3',
+        'ds': _user_center_ds(),
         'User-Agent': OKHTTP_UA,
     }
     response = requests.post(REFRESH_TOKEN_URL, headers=headers)
@@ -739,7 +766,7 @@ def refresh_access_token(account):
         raise Exception('refreshToken 已失效，请重新登录')
     resp = _safe_json(response, '刷新token')
     if not _is_ok(resp):
-        raise Exception(f'刷新token失败：{resp.get("msg") or resp}')
+        raise Exception(f'刷新token失败：{resp.get("message") or resp.get("msg") or resp}')
 
     data = resp.get('data') or {}
     access_token = data.get('accessToken')
@@ -754,11 +781,13 @@ def refresh_access_token(account):
 
 def get_game_role_ids(access_token, uid, device_id, game_id):
     headers = {
+        'Accept': 'application/json',
         'platform': 'android',
         'authorization': access_token,
         'uid': uid,
         'deviceid': device_id,
-        'appversion': APPVERSION,
+        'appversion': USER_CENTER_APPVERSION,
+        'ds': _user_center_ds(),
         'User-Agent': OKHTTP_UA,
     }
     response = requests.get(GET_GAME_ROLES_URL, headers=headers, params={'gameId': game_id})
@@ -778,10 +807,12 @@ def get_game_role_ids(access_token, uid, device_id, game_id):
 def app_signin(access_token, uid, device_id):
     headers = {
         **REQUEST_HEADERS_BASE,
+        'Accept': 'application/json',
         'authorization': access_token,
         'uid': uid,
         'deviceid': device_id,
-        'appversion': APPVERSION,
+        'appversion': USER_CENTER_APPVERSION,
+        'ds': _user_center_ds(),
         'User-Agent': OKHTTP_UA,
     }
     response = _request_form(APP_SIGNIN_URL, {'communityId': COMMUNITY_ID}, headers)
@@ -887,7 +918,7 @@ def game_signin(access_token, role_id, game_id):
     headers = {
         **REQUEST_HEADERS_BASE,
         'authorization': access_token,
-        'appversion': APPVERSION,
+        'appversion': USER_CENTER_APPVERSION,
         'User-Agent': OKHTTP_UA,
     }
 
@@ -1266,5 +1297,5 @@ if __name__ == '__main__':
     logging.info(f'任务结束 | success={success} | 耗时={(end_time - start_time) * 1000:.0f}ms')
     if (exit_when_fail_env == "on") and not success:
         exit(1)
-    if (os.name == 'nt') and (not token_env) and (not no_pause_env) and (not success):
-        input('运行失败，按回车键退出...')
+    if (os.name == 'nt') and (not token_env) and (not no_pause_env):
+        input('运行结束，按回车键退出...')
