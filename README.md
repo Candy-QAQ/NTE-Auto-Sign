@@ -93,7 +93,7 @@ python nte.py
    在「订阅管理」新建一条任务，复制下面命令，并在名称中粘贴：
 
    ```
-   ql repo https://github.com/Candy-QAQ/NTE-Auto-Sign.git "" "index.py|add_account.py|SecuritySm.py|test|nte.py" "nte.py|requirements.txt" "main" "py"
+   ql repo https://github.com/Candy-QAQ/NTE-Auto-Sign.git "" "add_account.py|nte.py" "nte.py|requirements.txt" "main" "py"
    ```
 
    粘贴后按图补全，其余留空或按需填写。
@@ -108,7 +108,7 @@ python nte.py
    命令参数说明：
 
    - 白名单（第 2 个参数，`""`， 也就是无参数）：不过滤，拉取全部文件；
-   - 黑名单（第 3 个参数）：排除`index.py`、`add_account.py`、`SecuritySm.py`、`test/`，以及 `nte.py`（`nte.py` 改由依赖方式拉取，避免重复建任务）；
+   - 黑名单（第 3 个参数）：排除 `add_account.py` 和 `nte.py`（`nte.py` 改由依赖方式拉取，避免重复建任务）；
    - 依赖（第 4 个参数）：`nte.py` 是签到核心（供入口 `import` 使用），`requirements.txt` 用于自动安装 `requests`、`cryptography`依赖；
    - 分支 `main`、后缀 `py`。
 
