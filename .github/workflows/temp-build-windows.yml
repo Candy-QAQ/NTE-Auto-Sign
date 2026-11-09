@@ -12,14 +12,14 @@ on:
       - .github/workflows/temp-build-windows.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
       - name: Install dependencies
@@ -28,11 +28,11 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --clean --distpath dist/windows --workpath build/nte nte.spec
           python -m PyInstaller --noconfirm --clean --distpath dist/windows --workpath build/add-account add_account.spec
-      - name: Commit executables
-        shell: bash
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add dist/windows/nte.exe dist/windows/add_account.exe
-          git diff --cached --quiet || git commit -m "build: refresh Windows executables"
-          git push
+      - name: Upload executables
+        uses: actions/upload-artifact@v7
+        with:
+          name: nte-auto-sign-windows
+          path: |
+            dist/windows/nte.exe
+            dist/windows/add_account.exe
+          if-no-files-found: error

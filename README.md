@@ -150,12 +150,14 @@ python nte.py
 
 ## Windows EXE 使用
 
-预编译文件位于 `dist\windows\`：
+从 [Releases](https://github.com/Candy-QAQ/NTE-Auto-Sign/releases) 下载 Windows EXE 压缩包并解压，包含以下程序。
 
 - `nte.exe`：签到主程序
 - `add_account.exe`：账号添加工具
 
 双击即可运行。
+
+开发构建可进入 `Actions` -> `Temporary Windows build`，从成功运行的 `Artifacts` 下载 `nte-auto-sign-windows`。
 
 ## 环境变量
 
