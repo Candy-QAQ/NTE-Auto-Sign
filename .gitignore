@@ -18,3 +18,5 @@ dist/
 
 # Local account credentials (including dist/windows/TOKEN.txt)
 TOKEN.txt
+TOKEN.txt.lock
+.TOKEN-*.tmp

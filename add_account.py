@@ -14,6 +14,14 @@ def _ask_continue():
 
 
 def main():
+    try:
+        with nte.account_file_lock():
+            _main()
+    except OSError as ex:
+        print(f'账号文件暂不可用：{ex}')
+
+
+def _main():
     print('塔吉多（异环）账号添加工具')
     nte.config_logger()
 

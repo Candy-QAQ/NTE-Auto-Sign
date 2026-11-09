@@ -6,8 +6,11 @@ import os
 import os.path
 import secrets
 import string
+import sys
+import tempfile
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import date
 from urllib import parse
 
@@ -15,7 +18,10 @@ import requests
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-token_save_name = 'TOKEN.txt'
+token_save_name = (
+    os.path.join(os.path.dirname(sys.executable), 'TOKEN.txt')
+    if getattr(sys, 'frozen', False) else 'TOKEN.txt'
+)
 token_env = os.environ.get('TOKEN')
 exit_when_fail_env = os.environ.get('EXIT_WHEN_FAIL')
 current_type = os.environ.get('SKYLAND_TYPE')
@@ -409,10 +415,52 @@ def _account_to_line(account):
     return json.dumps(payload, ensure_ascii=False)
 
 
-def save(accounts):
-    with open(token_save_name, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(_account_to_line(i) for i in accounts))
-    print(f'账号信息已保存在 {token_save_name}，下次运行会直接签到。')
+@contextmanager
+def account_file_lock():
+    # Keep the lock file in place so every process locks the same file.
+    with open(os.path.abspath(token_save_name) + '.lock', 'a+b') as lock_file:
+        lock_file.seek(0, os.SEEK_END)
+        if lock_file.tell() == 0:
+            lock_file.write(b'\0')
+            lock_file.flush()
+        lock_file.seek(0)
+        if os.name == 'nt':
+            import msvcrt
+            try:
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError as ex:
+                raise BlockingIOError('已有程序正在使用此账号文件，请等待当前任务结束后再运行。') from ex
+        else:
+            import fcntl
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as ex:
+                raise BlockingIOError('已有程序正在使用此账号文件，请等待当前任务结束后再运行。') from ex
+        try:
+            yield
+        finally:
+            if os.name == 'nt':
+                lock_file.seek(0)
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def save(accounts, announce=True):
+    payload = '\n'.join(_account_to_line(i) for i in accounts)
+    destination = os.path.abspath(token_save_name)
+    descriptor, temporary = tempfile.mkstemp(prefix='.TOKEN-', suffix='.tmp', dir=os.path.dirname(destination))
+    try:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as f:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, destination)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    if announce:
+        print(f'账号信息已保存在 {token_save_name}，下次运行会直接签到。')
 
 
 def read(path):
@@ -1165,7 +1213,7 @@ def input_for_token():
     raise SystemExit(-1)
 
 
-def init_token():
+def init_token(select_accounts=True):
     if token_env:
         print('使用环境变量里的账号信息...')
         return read_from_env()
@@ -1180,6 +1228,8 @@ def init_token():
     if add_account:
         return []
 
+    if not select_accounts:
+        return accounts
     if select_accounts_env == '1':
         selected_accounts = _select_accounts(accounts)
     else:
@@ -1190,7 +1240,7 @@ def init_token():
     return selected_accounts
 
 
-def do_sign(account):
+def do_sign(account, persist=None):
     account['gameId'] = str(account.get('gameId') or _default_game_id())
     if not account.get('deviceId'):
         account['deviceId'] = _random_device_id()
@@ -1206,6 +1256,8 @@ def do_sign(account):
 
     if has_tajiduo:
         access_token = refresh_access_token(account)
+        if persist is not None:
+            persist()
         uid = str(account.get('uid') or '').strip()
         if uid:
             app_ok, app_msg = app_signin(access_token, uid, account['deviceId'])
@@ -1263,24 +1315,45 @@ def do_sign(account):
 
 
 def start():
+    if token_env:
+        return _start()
     try:
-        accounts = init_token()
+        with account_file_lock():
+            return _start()
+    except OSError as ex:
+        print(f'账号文件暂不可用：{ex}')
+        return False
+
+
+def _start():
+    try:
+        all_accounts = init_token(select_accounts=False)
     except Exception as ex:
         print(f'初始化失败，原因：{str(ex)}')
         logging.error('', exc_info=ex)
         return False
 
+    accounts = all_accounts
+    persist = None
+    if not token_env:
+        persist = lambda: save(all_accounts, announce=False)
+        if select_accounts_env == '1':
+            accounts = _select_accounts(all_accounts)
+        elif len(accounts) > 1:
+            print(f'检测到 {len(accounts)} 个账号，默认签到全部账号。')
+        print(f'本次将签到 {len(accounts)} 个账号。')
+
     success = True
     for account in accounts:
         try:
-            success = do_sign(account) and success
+            success = do_sign(account, persist=persist) and success
         except Exception as ex:
             print(f'签到失败，原因：{str(ex)}')
             logging.error('', exc_info=ex)
             success = False
 
-    if accounts and not token_env:
-        save(accounts)
+    if all_accounts and not token_env:
+        save(all_accounts)
     print('签到完成！')
     return success
 
