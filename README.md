@@ -90,27 +90,36 @@ python nte.py
 
 1. **新建拉库任务**
 
-   在「订阅管理」新建一条任务，复制下面命令，并在名称中粘贴：
+   在「订阅管理」新建公开仓库订阅，按下面的字段配置。
+
+   | 字段 | 内容 |
+   | --- | --- |
+   | 名称 | 塔吉多（异环）自动签到，可自行修改 |
+   | 链接 | `https://github.com/Candy-QAQ/NTE-Auto-Sign.git` |
+   | 分支 | `main` |
+   | 定时类型 | `crontab` |
+   | 定时规则 | `0 8 * * *`，每天 08:00 更新仓库 |
+   | 白名单 | `qinglong.py` |
+   | 黑名单 | `index.py\|add_account.py\|SecuritySm.py\|test\|nte.py` |
+   | 依赖文件 | `nte.py\|requirements.txt` |
+   | 文件后缀 | 留空，使用青龙默认后缀（包含 `py`） |
+   | 自动添加任务 | 开启 |
+
+   执行前、执行后和代理按需填写。订阅定时规则控制仓库更新，签到时间在「定时任务」中设置。
+
+   对应的拉库命令如下。
 
    ```
-   ql repo https://github.com/Candy-QAQ/NTE-Auto-Sign.git "" "add_account.py|nte.py" "nte.py|requirements.txt" "main" "py"
+   ql repo https://github.com/Candy-QAQ/NTE-Auto-Sign.git "qinglong.py" "index.py|add_account.py|SecuritySm.py|test|nte.py" "nte.py|requirements.txt" "main" ""
    ```
 
-   粘贴后按图补全，其余留空或按需填写。
+   保存后检查白名单、黑名单和依赖文件是否与上表一致。
 
    <p align="center">
-     <img src="assets/ql1.png" alt="青龙面板订阅配置演示图 1" width="800">
-   </p>
-   <p align="center">
-     <img src="assets/ql2.png" alt="青龙面板订阅配置演示图 2" width="800">
+     <img src="assets/ql1.png" alt="青龙面板订阅完整配置示例" width="650">
    </p>
 
-   命令参数说明：
-
-   - 白名单（第 2 个参数，`""`， 也就是无参数）：不过滤，拉取全部文件；
-   - 黑名单（第 3 个参数）：排除 `add_account.py` 和 `nte.py`（`nte.py` 改由依赖方式拉取，避免重复建任务）；
-   - 依赖（第 4 个参数）：`nte.py` 是签到核心（供入口 `import` 使用），`requirements.txt` 用于自动安装 `requests`、`cryptography`依赖；
-   - 分支 `main`、后缀 `py`。
+   白名单使 `qinglong.py` 成为自动创建的签到任务。`nte.py` 通过依赖文件提供给签到入口。请在「依赖管理」的 Python 分类中安装 `requests` 和 `cryptography`。
 
    > 使用 GitHub 仓库需要自行解决网络问题，地址前可加代理理前缀。
 
@@ -118,7 +127,7 @@ python nte.py
 
    拉库后，青龙会识别 `qinglong.py`，并根据其头部声明自动创建定时任务：
 
-   _塔吉多（异环）自动签到 cron: 0 8 _ \* _ （每天 08:00）_
+   任务名称为「塔吉多（异环）自动签到」，定时规则为 `0 8 * * *`（每天 08:00）。
 
    签到时间由 [qinglong.py](qinglong.py) 头部 `cron: 0 8 * * *` 决定，需要改时间时直接改头部，或在面板里修改任务定时规则。
 
