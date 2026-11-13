@@ -11,6 +11,10 @@ import sys
 _ntoken = os.environ.get('NTE_TOKEN')
 if _ntoken:
     os.environ['TOKEN'] = _ntoken
+    if os.path.isdir('/ql/data'):
+        os.environ.setdefault(
+            'NTE_TOKEN_CACHE', '/ql/data/.nte-auto-sign/token-cache.json'
+        )
 
 import nte
 

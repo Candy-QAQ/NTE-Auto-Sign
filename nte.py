@@ -23,6 +23,9 @@ token_save_name = (
     if getattr(sys, 'frozen', False) else 'TOKEN.txt'
 )
 token_env = os.environ.get('TOKEN')
+token_cache_name = os.environ.get('NTE_TOKEN_CACHE') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '.nte-token-cache.json'
+)
 exit_when_fail_env = os.environ.get('EXIT_WHEN_FAIL')
 current_type = os.environ.get('SKYLAND_TYPE')
 role_ids_env = os.environ.get('TGD_ROLE_IDS')
@@ -416,9 +419,9 @@ def _account_to_line(account):
 
 
 @contextmanager
-def account_file_lock():
+def account_file_lock(path=None):
     # Keep the lock file in place so every process locks the same file.
-    with open(os.path.abspath(token_save_name) + '.lock', 'a+b') as lock_file:
+    with open(os.path.abspath(path or token_save_name) + '.lock', 'a+b') as lock_file:
         lock_file.seek(0, os.SEEK_END)
         if lock_file.tell() == 0:
             lock_file.write(b'\0')
@@ -446,9 +449,8 @@ def account_file_lock():
                 fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
-def save(accounts, announce=True):
-    payload = '\n'.join(_account_to_line(i) for i in accounts)
-    destination = os.path.abspath(token_save_name)
+def _atomic_write_text(path, payload):
+    destination = os.path.abspath(path)
     descriptor, temporary = tempfile.mkstemp(prefix='.TOKEN-', suffix='.tmp', dir=os.path.dirname(destination))
     try:
         with os.fdopen(descriptor, 'w', encoding='utf-8') as f:
@@ -459,6 +461,11 @@ def save(accounts, announce=True):
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def save(accounts, announce=True):
+    payload = '\n'.join(_account_to_line(i) for i in accounts)
+    _atomic_write_text(token_save_name, payload)
     if announce:
         print(f'账号信息已保存在 {token_save_name}，下次运行会直接签到。')
 
@@ -542,9 +549,45 @@ def _env_items():
     return rows
 
 
-def read_from_env():
-    accounts = []
+def _env_account_sources():
+    sources = {}
     for row in _env_items():
+        try:
+            source = json.dumps(json.loads(row), sort_keys=True, ensure_ascii=False)
+        except json.JSONDecodeError:
+            source = row
+        key = hashlib.sha256(source.encode('utf-8')).hexdigest()
+        sources[key] = row
+    return sources
+
+
+def _read_env_cache():
+    if not os.path.exists(token_cache_name):
+        return {}
+    try:
+        with open(token_cache_name, 'r', encoding='utf-8') as cache_file:
+            cache = json.load(cache_file)
+        if cache.get('version') != 1 or not isinstance(cache.get('accounts'), dict):
+            raise ValueError
+    except (ValueError, AttributeError) as ex:
+        raise ValueError('凭据缓存格式损坏，请从备份恢复缓存或重新登录并更新环境变量。') from ex
+    return cache['accounts']
+
+
+def save_env_accounts(accounts):
+    entries = {
+        key: json.loads(_account_to_line(account))
+        for key, account in zip(_env_account_sources(), accounts)
+    }
+    _atomic_write_text(token_cache_name, json.dumps({'version': 1, 'accounts': entries}))
+
+
+def read_from_env():
+    cached = _read_env_cache()
+    accounts = []
+    for key, row in _env_account_sources().items():
+        if key in cached:
+            row = json.dumps(cached[key])
         account = parse_account_line(row)
         if account:
             accounts.append(account)
@@ -1315,10 +1358,11 @@ def do_sign(account, persist=None):
 
 
 def start():
-    if token_env:
-        return _start()
     try:
-        with account_file_lock():
+        storage_path = token_cache_name if token_env else token_save_name
+        if token_env:
+            os.makedirs(os.path.dirname(os.path.abspath(storage_path)), exist_ok=True)
+        with account_file_lock(storage_path):
             return _start()
     except OSError as ex:
         print(f'账号文件暂不可用：{ex}')
@@ -1334,8 +1378,11 @@ def _start():
         return False
 
     accounts = all_accounts
-    persist = None
-    if not token_env:
+    if token_env:
+        persist = lambda: save_env_accounts(all_accounts)
+        # Ensure the cache is writable before consuming a refresh token.
+        persist()
+    else:
         persist = lambda: save(all_accounts, announce=False)
         if select_accounts_env == '1':
             accounts = _select_accounts(all_accounts)
@@ -1352,8 +1399,8 @@ def _start():
             logging.error('', exc_info=ex)
             success = False
 
-    if all_accounts and not token_env:
-        save(all_accounts)
+    if all_accounts:
+        persist()
     print('签到完成！')
     return success
 

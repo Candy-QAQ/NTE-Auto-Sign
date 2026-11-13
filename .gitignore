@@ -20,3 +20,5 @@ dist/
 TOKEN.txt
 TOKEN.txt.lock
 .TOKEN-*.tmp
+.nte-token-cache.json
+.nte-token-cache.json.lock
